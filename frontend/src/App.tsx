@@ -1,8 +1,8 @@
 import { Header } from "./components/Header";
 import { InputConsole } from "./components/InputConsole";
 import { DataNode } from "./components/DataNode";
+import { Layout } from "./components/Layout";
 
-// High quality mock data
 const MOCK_DATA = [
   {
     title: "Razer BlackWidow V3 Pro",
@@ -32,37 +32,44 @@ const MOCK_DATA = [
 
 function App() {
   return (
+    <Layout>
       <Header />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 pt-32 pb-20 flex flex-col">
-        {/* Title Area */}
-        <section className="text-center mb-16 space-y-2">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-            NEURAL<span className="text-neon">SEARCH</span>
-          </h1>
-          <p className="text-gray-500 font-mono text-sm tracking-widest uppercase">
-            Multimodal Siamese Network // Amazon Dataset
-          </p>
+      <main className="flex-1 w-full mx-auto max-w-6xl px-6 pt-32 pb-16 flex flex-col gap-12">
+        <section className="text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-mono uppercase tracking-[0.3em] text-cyan-200">
+            Amazon Product Siamese • Multimodal
+          </div>
+          <div className="space-y-4">
+            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white drop-shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+              Quantum Recommendation Deck
+            </h1>
+            <p className="text-base md:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">
+              Fuse textual embeddings and visual signals inside a Siamese network to surface products that feel tailor-made. Input a description, upload an image, and let the model triangulate the closest matches.
+            </p>
+          </div>
 
           <InputConsole />
         </section>
 
-        {/* Results Grid */}
-        <section>
-          <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-xs font-mono text-gray-500">
-              INFERENCE_OUTPUT
-            </h2>
-            <div className="h-px bg-white/10 flex-1 mx-4" />
+        <section className="bg-void-800/70 border border-white/10 rounded-2xl shadow-2xl shadow-black/50 backdrop-blur-xl p-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/10 pointer-events-none" />
+          <div className="flex items-center justify-between mb-5 relative z-10">
+            <div>
+              <p className="text-xs font-mono text-cyan-200/80 tracking-[0.3em]">INFERENCE OUTPUT</p>
+              <h2 className="text-xl font-semibold text-white">Closest Product Vectors</h2>
+            </div>
+            <div className="h-px w-28 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {MOCK_DATA.map((item, i) => (
               <DataNode key={i} data={item} />
             ))}
           </div>
         </section>
       </main>
+    </Layout>
   );
 }
 
