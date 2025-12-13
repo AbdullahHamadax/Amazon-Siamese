@@ -6,16 +6,16 @@ import DatasetInfo from "./components/DatasetInfo";
 import SystemLoad from "./components/SystemLoad";
 import ArchitectureViz from "./components/ArchitectureViz";
 import {
-  Image as ImageIcon,
   UploadCloud,
   ArrowRight,
   Maximize2,
   AlertTriangle,
   X,
   Check,
+  Search,
 } from "lucide-react";
 
-// --- Sub-components ---
+// --- Components ---
 
 const ProductCard = ({
   title,
@@ -26,85 +26,112 @@ const ProductCard = ({
   score: number;
   img: string;
 }) => (
-  <div className="bg-slate-900/80 border border-slate-800 rounded overflow-hidden hover:border-cyan-500/50 transition-all duration-300 group cursor-pointer">
-    <div className="relative aspect-[3/4] overflow-hidden">
+  <div className="flex flex-col bg-slate-900 border border-slate-700/50 rounded-lg overflow-hidden hover:border-cyan-500 transition-all duration-300 group shadow-lg hover:shadow-cyan-500/20">
+    {/* Image Container */}
+    <div className="relative w-full h-64 bg-white/5 p-4 flex items-center justify-center overflow-hidden">
       <img
         src={img}
         alt={title}
-        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0"
+        className="max-w-full max-h-full object-contain transition-transform duration-500 group-hover:scale-105"
+        onError={(e) => {
+          // Fallback if image fails to load
+          (e.target as HTMLImageElement).src =
+            "https://placehold.co/400x600/1e293b/475569?text=Image+Not+Found";
+        }}
       />
-      <div className="absolute top-2 right-2 bg-slate-950/90 px-2 py-0.5 rounded text-[10px] font-mono text-cyan-400 border border-cyan-500/30">
-        SIM: {score}%
+
+      {/* Similarity Badge */}
+      <div className="absolute top-2 right-2 bg-slate-950/90 backdrop-blur px-2 py-1 rounded text-xs font-mono text-cyan-400 border border-cyan-500/30 shadow-sm z-10">
+        {(score * 100).toFixed(1)}% MATCH
       </div>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/10 to-transparent translate-y-[-100%] group-hover:translate-y-[100%] transition-transform duration-1000 ease-in-out pointer-events-none"></div>
     </div>
-    <div className="p-3 border-t border-slate-800">
-      <h3 className="text-cyan-100 text-xs font-mono truncate">{title}</h3>
-      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-mono">
-        <span>ID_8473</span>
-        <span className="text-green-500">MATCH_FOUND</span>
+
+    {/* Text Info */}
+    <div className="p-3 bg-slate-950 border-t border-slate-800 flex-1 flex flex-col justify-between">
+      <div>
+        <h3
+          className="text-slate-200 text-sm font-medium leading-tight mb-1 line-clamp-2"
+          title={title}
+        >
+          {title}
+        </h3>
+        <p className="text-[10px] text-slate-500 font-mono">
+          ID: REF_{Math.floor(Math.random() * 9999)}
+        </p>
       </div>
     </div>
   </div>
 );
 
 const Recommender = () => {
-  // State for unified inputs
   const [inputText, setInputText] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [results, setResults] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Hidden file input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setSelectedImage(URL.createObjectURL(file));
+      setSelectedImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
       setError(null);
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      setSelectedImage(URL.createObjectURL(file));
-      setError(null);
-    }
-  };
-
-  const handleSearch = () => {
-    // 1. Reset previous errors
+  const handleSearch = async () => {
     setError(null);
 
-    // 2. Validation Logic
-    if (!inputText.trim() && !selectedImage) {
-      setError("CRITICAL_ERROR: MISSING_ALL_INPUT_PARAMETERS");
-      return;
-    }
     if (!inputText.trim()) {
       setError("INPUT_ERROR: TEXT_DESCRIPTION_REQUIRED");
       return;
     }
-    if (!selectedImage) {
+    if (!selectedImageFile) {
       setError("INPUT_ERROR: REFERENCE_IMAGE_REQUIRED");
       return;
     }
 
-    // 3. Proceed if valid
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setResults([]); // Clear previous results immediately
+
+    try {
+      const formData = new FormData();
+      formData.append("text", inputText);
+      formData.append("image", selectedImageFile);
+
+      // --- DEBUGGING LOG ---
+      console.log("Sending Request to Backend...");
+
+      const response = await fetch("http://localhost:8000/search", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Data received:", data); // Check your browser console!
+
+      setResults(data.results);
       setHasSearched(true);
-    }, 2000);
+    } catch (err) {
+      console.error(err);
+      setError("CRITICAL_ERROR: INFERENCE_FAILED_OR_BACKEND_OFFLINE");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6">
-      {/* Dashboard Top Section */}
+    <div className="flex-1 flex flex-col h-full overflow-y-auto custom-scrollbar p-6 bg-slate-950">
+      {/* 1. Header / Viz Section */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         <div className="xl:col-span-2">
           <ArchitectureViz />
@@ -114,59 +141,50 @@ const Recommender = () => {
         </div>
       </div>
 
-      {/* Unified Input Section */}
-      <div className="w-full max-w-5xl mx-auto mb-10">
-        {/* Input Container */}
+      {/* 2. Input Section */}
+      <div className="w-full max-w-6xl mx-auto mb-12">
         <div className="relative group">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl opacity-20 group-hover:opacity-30 transition duration-500 blur"></div>
 
-          <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-6 flex flex-col gap-6">
-            {/* Header */}
+          <div className="relative bg-slate-900 border border-slate-800 rounded-xl p-6 flex flex-col gap-6 shadow-2xl">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2 mb-2">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
-              <h3 className="text-cyan-400 font-mono text-xs font-bold tracking-widest">
-                QUERY_PARAMETERS
+              <Search className="text-cyan-400" size={18} />
+              <h3 className="text-cyan-400 font-mono text-sm font-bold tracking-widest">
+                MULTIMODAL_SEARCH_ENGINE
               </h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 1. Text Input Area */}
+              {/* Text Input */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-mono text-slate-500 flex justify-between">
-                  <span>01. PRODUCT_DESCRIPTION</span>
+                <label className="text-xs font-mono text-slate-400 flex justify-between">
+                  <span>PRODUCT DESCRIPTION</span>
                   {inputText.length > 0 && (
-                    <Check size={12} className="text-green-500" />
+                    <Check size={14} className="text-green-500" />
                   )}
                 </label>
                 <div
-                  className={`flex items-start gap-3 bg-slate-900/50 border rounded-lg p-4 h-32 transition-all ${
+                  className={`flex items-start gap-3 bg-slate-950 border rounded-lg p-3 h-32 transition-all ${
                     !inputText && error
-                      ? "border-red-500/50 bg-red-900/10"
+                      ? "border-red-500/50"
                       : "border-slate-800 focus-within:border-cyan-500/50"
                   }`}
                 >
-                  {/* FIXED: Changed size to text-sm, added bold, adjusted padding to align perfectly */}
-                  <span className="text-cyan-500 font-mono text-sm font-bold pt-0.5">
-                    &gt;
-                  </span>
                   <textarea
                     value={inputText}
-                    onChange={(e) => {
-                      setInputText(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    placeholder="Enter detailed product attributes (e.g. 'Red floral summer dress with short sleeves')..."
-                    className="bg-transparent border-none outline-none text-slate-200 w-full h-full font-mono text-sm placeholder:text-slate-700 resize-none custom-scrollbar"
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="E.g. 'Blue denim jacket with collar'..."
+                    className="bg-transparent border-none outline-none text-slate-200 w-full h-full font-sans text-sm placeholder:text-slate-600 resize-none custom-scrollbar"
                   />
                 </div>
               </div>
 
-              {/* 2. Image Upload Area */}
+              {/* Image Upload */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-mono text-slate-500 flex justify-between">
-                  <span>02. REFERENCE_IMAGE</span>
-                  {selectedImage && (
-                    <Check size={12} className="text-green-500" />
+                <label className="text-xs font-mono text-slate-400 flex justify-between">
+                  <span>REFERENCE IMAGE</span>
+                  {selectedImageFile && (
+                    <Check size={14} className="text-green-500" />
                   )}
                 </label>
 
@@ -178,56 +196,44 @@ const Recommender = () => {
                   onChange={handleFileChange}
                 />
 
-                {selectedImage ? (
-                  <div className="relative h-32 bg-slate-900/50 border border-cyan-500/30 rounded-lg overflow-hidden group/image">
+                {previewUrl ? (
+                  <div className="relative h-32 bg-slate-950 border border-cyan-500/30 rounded-lg overflow-hidden group/image flex items-center justify-center">
                     <img
-                      src={selectedImage}
+                      src={previewUrl}
                       alt="Preview"
-                      className="w-full h-full object-cover opacity-60 group-hover/image:opacity-100 transition-opacity"
+                      className="h-full object-contain p-2"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setSelectedImage(null)}
-                        className="bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/50 px-3 py-1 rounded text-xs font-mono flex items-center gap-2 backdrop-blur-sm"
-                      >
-                        <X size={12} /> REMOVE
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedImageFile(null);
+                        setPreviewUrl(null);
+                      }}
+                      className="absolute top-2 right-2 bg-slate-900/80 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-1.5 rounded transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleDrop}
-                    className={`h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-slate-500 transition-all cursor-pointer bg-slate-900/30
-                          ${
-                            error && !selectedImage
-                              ? "border-red-500/40 bg-red-900/5 text-red-400"
-                              : "border-slate-800 hover:border-cyan-500/50 hover:text-cyan-400 hover:bg-cyan-900/5"
-                          }
-                        `}
+                    className={`h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-slate-500 transition-all cursor-pointer bg-slate-950 ${
+                      error && !selectedImageFile
+                        ? "border-red-500/40 text-red-400"
+                        : "border-slate-800 hover:border-cyan-500/50 hover:text-cyan-400"
+                    }`}
                   >
                     <UploadCloud size={24} className="mb-2" />
-                    <span className="text-xs font-mono">
-                      DRAG_DROP OR CLICK_TO_UPLOAD
-                    </span>
+                    <span className="text-xs font-mono">UPLOAD IMAGE</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="flex flex-col md:flex-row justify-between items-center pt-2 border-t border-slate-800/50 gap-4">
-              {/* Error Console */}
-              <div className="flex-1 w-full md:w-auto h-8 flex items-center">
-                {error && (
-                  <div className="flex items-center gap-2 text-red-400 bg-red-500/10 px-3 py-1.5 rounded border border-red-500/20 text-xs font-mono animate-in slide-in-from-left-2 fade-in">
-                    <AlertTriangle size={12} />
-                    <span className="font-bold">{error}</span>
-                  </div>
-                )}
+            {/* Submit Button */}
+            <div className="flex flex-col md:flex-row justify-between items-center pt-4 border-t border-slate-800 gap-4">
+              <div className="flex-1 text-red-400 text-xs font-mono">
+                {error}
               </div>
-
               <button
                 onClick={handleSearch}
                 disabled={loading}
@@ -246,88 +252,64 @@ const Recommender = () => {
         </div>
       </div>
 
-      {/* Results Terminal */}
+      {/* 3. Results Grid */}
       {(hasSearched || loading) && (
-        <div className="border border-slate-800 bg-slate-950/80 rounded-lg overflow-hidden flex flex-col animate-in fade-in duration-500">
-          <div className="px-4 py-2 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
-            <span className="text-xs text-cyan-500 font-mono flex items-center gap-2">
-              <Maximize2 size={12} /> OUTPUT_CONSOLE
-            </span>
-            <span className="text-[10px] text-slate-500 font-mono">
-              EXEC_TIME: 420ms
-            </span>
+        <div className="w-full max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
+          <div className="flex items-center gap-3 mb-6">
+            <Maximize2 size={16} className="text-cyan-500" />
+            <h2 className="text-lg text-slate-200 font-mono tracking-wider">
+              SEARCH_RESULTS <span className="text-slate-600">//</span>{" "}
+              {results.length} ITEMS FOUND
+            </h2>
           </div>
 
-          <div className="p-6 min-h-[300px]">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center h-48 gap-4">
-                <div className="font-mono text-cyan-400 text-sm animate-pulse">
-                  &gt; FUSING TEXT_EMBEDDINGS + IMAGE_VECTORS...
-                </div>
-                <div className="w-64 h-1 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-cyan-500 animate-[loading_1s_ease-in-out_infinite] w-1/3"></div>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {loading ? (
+            <div className="h-64 flex flex-col items-center justify-center border border-slate-800 rounded-xl bg-slate-900/50">
+              <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-cyan-500 font-mono animate-pulse">
+                Running Neural Inference...
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {results.map((rec) => (
                 <ProductCard
-                  title="Floral_Summer_Dress_v2"
-                  score={98.4}
-                  img="https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&q=80&w=400"
+                  key={rec.id}
+                  title={rec.title}
+                  score={rec.score}
+                  img={rec.image}
                 />
-                <ProductCard
-                  title="Red_Casual_Midi_01"
-                  score={85.1}
-                  img="https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&q=80&w=400"
-                />
-                <ProductCard
-                  title="Vintage_Print_Y7"
-                  score={72.0}
-                  img="https://images.unsplash.com/photo-1612336307429-8a898d10e223?auto=format&fit=crop&q=80&w=400"
-                />
-                <ProductCard
-                  title="Evening_Gown_Red"
-                  score={64.2}
-                  img="https://images.unsplash.com/photo-1539008835657-9e8e9680c956?auto=format&fit=crop&q=80&w=400"
-                />
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-// --- Main Layout ---
+// --- Main App Layout ---
 
 function App() {
   const [activeTab, setActiveTab] = useState("home");
-
   return (
-    <div className="w-screen h-screen flex flex-col font-sans selection:bg-cyan-500/30 overflow-hidden relative">
-      {/* 1. Global Scanline Overlay */}
+    <div className="w-screen h-screen flex flex-col font-sans selection:bg-cyan-500/30 overflow-hidden relative text-slate-200">
       <div className="fixed inset-0 pointer-events-none z-[9999] scanline"></div>
-
-      {/* 2. Background Layers */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-slate-950">
-        <div className="absolute inset-0 bg-grid-pattern opacity-40"></div>
+        <div className="absolute inset-0 bg-grid-pattern opacity-30"></div>
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-cyan-900/10 to-transparent"></div>
       </div>
-
-      {/* 3. App Content */}
       <div className="relative z-10 flex flex-col h-full">
         <TopBar />
-
         <div className="flex-1 flex overflow-hidden">
           <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-
           <main className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
             {activeTab === "home" ? <Recommender /> : <DatasetInfo />}
           </main>
         </div>
-
-        <StatusBar status={activeTab === "home" ? "Idle" : "Reading Data"} />
+        <StatusBar
+          status={activeTab === "home" ? "System Ready" : "Reading Data"}
+        />
       </div>
     </div>
   );
